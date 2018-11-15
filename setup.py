@@ -12,7 +12,7 @@ from distutils.version import LooseVersion
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
-        Extension.__init__(self, name, sources=['./'])
+        Extension.__init__(self, name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -45,25 +45,32 @@ class CMakeBuild(build_ext):
 
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'
-                           .format(cfg.upper(), extdir)]
-            if sys.maxsize > 2**32:
-                cmake_args += ['-A', 'x64']
-            build_args += ['--', '/m']
+                           .format(cfg.upper(), extdir),
+                           '-G', 'MinGW Makefiles']  # force using MinGW
+            build_args += ['--']
+            cxx_flags = '-D_hypot=hypot'
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
             build_args += ['--', '-j', '6']
+            cxx_flags = ''
 
         env = os.environ.copy()
-        env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
+        env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\" {}'.format(
                 env.get('CXXFLAGS', ''),
-                self.distribution.get_version())
+                self.distribution.get_version(),
+                cxx_flags)
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
-        subprocess.check_call(['cmake', ext.sourcedir] +
-                              cmake_args, cwd=self.build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.'] +
-                              build_args, cwd=self.build_temp)
 
+        try:
+            subprocess.check_output(['cmake', ext.sourcedir] +
+                                  cmake_args, cwd=self.build_temp, env=env, stderr=subprocess.STDOUT)
+            subprocess.check_output(['cmake', '--build', '.'] +
+                                  build_args, cwd=self.build_temp, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            if e.output:
+                print(e.output.decode('ascii'))
+            raise
 
 setup(
     name='blspy',
