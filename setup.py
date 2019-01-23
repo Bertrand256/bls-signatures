@@ -69,7 +69,7 @@ class CMakeBuild(build_ext):
                                   build_args, cwd=self.build_temp, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             if e.output:
-                print(e.output.decode('ascii'))
+                print(e.output.decode('ascii', 'ignore'))
             raise
 
 setup(
